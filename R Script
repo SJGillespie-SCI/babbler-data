@@ -365,41 +365,6 @@ save_plot(
 )
 
 # ==========================================================
-# FIGURE 5
-# Broadcast architecture
-# (short repeated long-range units)
-# ==========================================================
-
-fig_broadcast <- ggplot(
-  structure_tbl,
-  aes(mean_duration, n_calls_total, colour = emission_context)
-) +
-  
-  geom_point(size = 4) +
-  
-  geom_text_repel(
-    aes(label = note_type),
-    size = 3,
-    max.overlaps = Inf
-  ) +
-  
-  scale_colour_manual(values = context_colours) +
-  
-  labs(
-    title = "Broadcast Architecture of Long-Range Signals",
-    x = "Mean Note Duration (seconds)",
-    y = "Total Calls Recorded",
-    colour = "Emission Context"
-  ) +
-  
-  theme_minimal(base_size = 12)
-
-save_plot(
-  fig_broadcast,
-  "Figure4_broadcast_structure.png"
-)
-
-# ==========================================================
 # Summary message
 # ==========================================================
 
@@ -407,5 +372,4 @@ cat("\nFigures exported to /figures folder:\n")
 cat("1. Acoustic morphospace\n")
 cat("2. Spectral structure panel\n")
 cat("3. Duration comparison\n")
-cat("4. Broadcast architecture\n")
 # =========================================================
