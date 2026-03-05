@@ -1,0 +1,411 @@
+# =========================================================
+# Chestnut-crowned Babbler Acoustic Structure Pipeline
+# Steven Gillespie
+# =========================================================
+
+# =========================================================
+# 0. LIBRARIES
+# =========================================================
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(janitor)
+library(ggplot2)
+library(ggrepel)
+library(classInt)
+library(patchwork)
+
+# =========================================================
+# 1. FILE PATH
+# =========================================================
+
+file_path <- "For Steven.xlsx"
+
+# =========================================================
+# 2. OUTPUT DIRECTORY
+# =========================================================
+
+dir.create("figures", showWarnings = FALSE)
+
+# =========================================================
+# 3. GLOBAL STYLE SETTINGS
+# =========================================================
+
+context_colours <- c(
+  short = "#2E7D32",   # deep green
+  long  = "#D84315"    # burnt orange
+)
+
+theme_set(theme_minimal(base_size = 14))
+
+fig_single_w <- 7
+fig_single_h <- 5
+
+fig_double_w <- 10
+fig_double_h <- 5
+
+fig_grid_w <- 10
+fig_grid_h <- 8
+
+save_plot <- function(plot, filename, w = fig_single_w, h = fig_single_h){
+  
+  ggsave(
+    filename = paste0("figures/", filename),
+    plot = plot,
+    width = w,
+    height = h,
+    dpi = 300
+  )
+  
+}
+
+# =========================================================
+# 4. LOAD DATA
+# =========================================================
+
+short_raw <- read_excel(file_path, sheet = "short") %>%
+  clean_names()
+
+long_raw <- read_excel(file_path, sheet = "long") %>%
+  clean_names()
+
+# =========================================================
+# 5. HARMONISE DATA STRUCTURE
+# =========================================================
+
+short_data <- short_raw %>%
+  group_by(caller_id, note_type) %>%
+  summarise(
+    mean_duration = mean(duration, na.rm = TRUE),
+    mean_f0_start = mean(f0_start, na.rm = TRUE),
+    mean_f0_end   = mean(f0_end, na.rm = TRUE),
+    mean_f0range  = mean(f0range, na.rm = TRUE),
+    mean_percent_time_max_f0 =
+      mean(percent_time_max_f0, na.rm = TRUE),
+    n_calls = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(emission_context = "short")
+
+long_data <- long_raw %>%
+  rename(
+    note_type = sy,
+    caller_id = group,
+    f0_start = start_f0,
+    f0_end = end_f0,
+    f0range = range,
+    percent_time_max_f0 = percent_time_to_peak
+  ) %>%
+  mutate(
+    mean_duration = duration,
+    mean_f0_start = f0_start,
+    mean_f0_end   = f0_end,
+    mean_f0range  = f0range,
+    mean_percent_time_max_f0 = percent_time_max_f0,
+    n_calls = 1,
+    emission_context = "long"
+  ) %>%
+  select(
+    caller_id, note_type,
+    mean_duration, mean_f0_start, mean_f0_end,
+    mean_f0range, mean_percent_time_max_f0,
+    n_calls, emission_context
+  )
+
+all_data <- bind_rows(short_data, long_data)
+
+# =========================================================
+# 6. DERIVED VARIABLES
+# =========================================================
+
+all_data <- all_data %>%
+  mutate(
+    mean_f0_change = mean_f0_end - mean_f0_start,
+    abs_f0_change  = abs(mean_f0_change),
+    mean_f0_slope  = mean_f0_change / mean_duration
+  )
+
+# =========================================================
+# 7. NOTE LEVEL DURATION CLASSES
+# =========================================================
+
+note_level <- all_data %>%
+  group_by(note_type) %>%
+  summarise(
+    note_mean_duration = mean(mean_duration, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+jenks_breaks <- classIntervals(
+  note_level$note_mean_duration,
+  n = 3,
+  style = "jenks"
+)
+
+note_level <- note_level %>%
+  mutate(
+    duration_class = cut(
+      note_mean_duration,
+      breaks = jenks_breaks$brks,
+      include.lowest = TRUE,
+      labels = c("Short","Medium","Long")
+    )
+  )
+
+all_data <- all_data %>%
+  left_join(note_level, by = "note_type")
+
+# =========================================================
+# 8. MORPHOTYPE MAP
+# =========================================================
+
+morphotype_map <- tibble(
+  note_type = c("SD","U",
+                "TI",
+                "A","T","TE",
+                "B","Boo",
+                "N","W",
+                "D","I1","L",
+                "I2"),
+  morphotype = c("M1","M1",
+                 "M2",
+                 "M3","M3","M3",
+                 "M4","M4",
+                 "M5","M5",
+                 "M6","M6","M6",
+                 "M7")
+)
+
+# =========================================================
+# 9. STRUCTURAL MATRIX
+# =========================================================
+
+structure_tbl <- all_data %>%
+  group_by(note_type, emission_context) %>%
+  summarise(
+    mean_duration = mean(mean_duration),
+    mean_f0range  = mean(mean_f0range),
+    mean_f0_change = mean(mean_f0_change),
+    abs_f0_change = mean(abs_f0_change),
+    mean_percent_time_max_f0 =
+      mean(mean_percent_time_max_f0),
+    n_calls_total = sum(n_calls),
+    .groups = "drop"
+  ) %>%
+  left_join(morphotype_map, by = "note_type") %>%
+  left_join(note_level, by = "note_type")
+
+# ==========================================================
+# Chestnut-crowned Babbler Dissertation
+# Visualisation Pipeline
+# Generates final thesis figures
+# ==========================================================
+
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(ggrepel)
+
+# ==========================================================
+# Colourblind-safe palette (Okabe–Ito)
+# ==========================================================
+
+context_colours <- c(
+  short = "#0072B2",
+  long  = "#E69F00"
+)
+
+# ==========================================================
+# Figure export settings
+# ==========================================================
+
+dir.create("figures", showWarnings = FALSE)
+
+fig_single_w <- 7
+fig_single_h <- 5
+
+fig_panel_w <- 10
+fig_panel_h <- 5
+
+save_plot <- function(plot, filename, w=7, h=5){
+  ggsave(
+    paste0("figures/", filename),
+    plot,
+    width = w,
+    height = h,
+    dpi = 300
+  )
+}
+
+# ==========================================================
+# Prepare variables
+# ==========================================================
+
+structure_tbl <- structure_tbl %>%
+  mutate(abs_f0_change = abs(mean_f0_change))
+
+# ==========================================================
+# FIGURE 1
+# Acoustic morphospace (regime separation)
+# ==========================================================
+
+fig_morphospace <- ggplot(
+  structure_tbl,
+  aes(mean_f0range, abs_f0_change, colour = emission_context)
+) +
+  
+  geom_point(size = 4, alpha = 0.9) +
+  
+  geom_text_repel(
+    aes(label = note_type),
+    size = 3,
+    max.overlaps = Inf
+  ) +
+  
+  scale_colour_manual(values = context_colours) +
+  
+  labs(
+    title = "Acoustic Morphospace of Babbler Notes",
+    x = "Fundamental Frequency Range (Hz)",
+    y = "Absolute Frequency Change (Hz)",
+    colour = "Emission Context"
+  ) +
+  
+  theme_minimal(base_size = 12)
+
+save_plot(
+  fig_morphospace,
+  "Figure1_acoustic_morphospace.png"
+)
+
+# ==========================================================
+# FIGURE 2
+# Spectral bandwidth comparison
+# ==========================================================
+
+fig_bandwidth <- ggplot(
+  structure_tbl,
+  aes(emission_context, mean_f0range, fill = emission_context)
+) +
+  
+  geom_violin(alpha = 0.6) +
+  geom_boxplot(width = 0.25) +
+  
+  scale_fill_manual(values = context_colours) +
+  
+  labs(
+    title = "Spectral Bandwidth by Emission Context",
+    x = "Emission Context",
+    y = "Mean F0 Range (Hz)"
+  ) +
+  
+  theme_minimal(base_size = 12)
+
+# ==========================================================
+# FIGURE 3
+# Contour magnitude comparison
+# ==========================================================
+
+fig_contour <- ggplot(
+  structure_tbl,
+  aes(emission_context, abs_f0_change, fill = emission_context)
+) +
+  
+  geom_violin(alpha = 0.6) +
+  geom_boxplot(width = 0.25) +
+  
+  scale_fill_manual(values = context_colours) +
+  
+  labs(
+    title = "Frequency Contour Magnitude by Context",
+    x = "Emission Context",
+    y = "Absolute F0 Change (Hz)"
+  ) +
+  
+  theme_minimal(base_size = 12)
+
+# Combine spectral plots (1×2 panel)
+
+fig_spectral_panel <- fig_bandwidth + fig_contour
+
+save_plot(
+  fig_spectral_panel,
+  "Figure2_spectral_structure.png",
+  w = fig_panel_w,
+  h = fig_panel_h
+)
+
+# ==========================================================
+# FIGURE 4
+# Duration by context
+# ==========================================================
+
+fig_duration <- ggplot(
+  structure_tbl,
+  aes(emission_context, mean_duration, fill = emission_context)
+) +
+  
+  geom_violin(alpha = 0.6) +
+  geom_boxplot(width = 0.25) +
+  
+  scale_fill_manual(values = context_colours) +
+  
+  labs(
+    title = "Note Duration by Emission Context",
+    x = "Emission Context",
+    y = "Mean Duration (seconds)"
+  ) +
+  
+  theme_minimal(base_size = 12)
+
+save_plot(
+  fig_duration,
+  "Figure3_duration_by_context.png"
+)
+
+# ==========================================================
+# FIGURE 5
+# Broadcast architecture
+# (short repeated long-range units)
+# ==========================================================
+
+fig_broadcast <- ggplot(
+  structure_tbl,
+  aes(mean_duration, n_calls_total, colour = emission_context)
+) +
+  
+  geom_point(size = 4) +
+  
+  geom_text_repel(
+    aes(label = note_type),
+    size = 3,
+    max.overlaps = Inf
+  ) +
+  
+  scale_colour_manual(values = context_colours) +
+  
+  labs(
+    title = "Broadcast Architecture of Long-Range Signals",
+    x = "Mean Note Duration (seconds)",
+    y = "Total Calls Recorded",
+    colour = "Emission Context"
+  ) +
+  
+  theme_minimal(base_size = 12)
+
+save_plot(
+  fig_broadcast,
+  "Figure4_broadcast_structure.png"
+)
+
+# ==========================================================
+# Summary message
+# ==========================================================
+
+cat("\nFigures exported to /figures folder:\n")
+cat("1. Acoustic morphospace\n")
+cat("2. Spectral structure panel\n")
+cat("3. Duration comparison\n")
+cat("4. Broadcast architecture\n")
+# =========================================================
