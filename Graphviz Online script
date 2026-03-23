@@ -1,39 +1,39 @@
 digraph AcousticFramework {
 
 graph [
-rankdir=TB
-splines=ortho
-nodesep=0.7
-ranksep=1.0
-bgcolor="#e9f5ec:#fff1c7:#e5e8ff"
-gradientangle=0
+  rankdir=TB
+  splines=ortho
+  nodesep=0.7
+  ranksep=1.0
+  bgcolor="#e9f5ec:#fff1c7:#e5e8ff"
+  gradientangle=0
 ]
 
 node [
-shape=box
-style="rounded,filled"
-fillcolor="white"
-fontname="Helvetica"
-fontsize=11
-penwidth=2
+  shape=box
+  style="rounded,filled"
+  fillcolor="white"
+  fontname="Helvetica"
+  fontsize=11
+  penwidth=2
 ]
 
 edge [
-fontname="Helvetica"
-fontsize=10
+  fontname="Helvetica"
+  fontsize=10
 ]
 
 ### DATA ACQUISITION
 
 FieldRecordings [
-label="Field Recordings"
-color="#555555"
+  label="Field Recordings"
+  color="#555555"
 ]
 
 ContextDecision [
-shape=diamond
-label="Behavioural Context Known?"
-color="#555555"
+  shape=diamond
+  label="Behavioural Context Known?"
+  color="#555555"
 ]
 
 FieldRecordings -> ContextDecision
@@ -42,139 +42,201 @@ FieldRecordings -> ContextDecision
 ### EMPIRICAL STRUCTURAL ANALYSIS
 
 Measurement [
-label="Note-Level Acoustic Measurement\n(spectral bandwidth, contour magnitude, duration)"
-color="#1b7f3b"
+  label="Note-Level Acoustic Measurement\n(spectral bandwidth, contour magnitude, duration)"
+  color="#1b7f3b"
 ]
 
 Morphotype [
-label="Structural Morphotype Classification"
-color="#1b7f3b"
+  label="Structural Morphotype Classification"
+  color="#1b7f3b"
 ]
 
-ContextDecision -> Measurement [label="YES" color="#1b7f3b"]
+ContextDecision -> Measurement [
+  label="YES"
+  color="#1b7f3b"
+]
 
-Measurement -> Morphotype [color="#1b7f3b"]
+Measurement -> Morphotype [
+  color="#1b7f3b"
+]
 
 
 ### REPERTOIRE COMPARISON
 
 CompareRep [
-label="Comparison to Repertoire"
-color="#b58900"
+  label="Comparison to Repertoire"
+  color="#b58900"
 ]
 
 MatchDecision [
-shape=diamond
-label="Match Existing Morphotype?"
-color="#b58900"
+  shape=diamond
+  label="Match Existing Morphotype?"
+  color="#b58900"
 ]
 
-Morphotype -> CompareRep [color="#b58900"]
-CompareRep -> MatchDecision [color="#b58900"]
+Morphotype -> CompareRep [
+  color="#b58900"
+]
+
+CompareRep -> MatchDecision [
+  color="#b58900"
+]
 
 
 ### NEW MORPHOTYPE
 
 NewMorphotype [
-label="New Morphotype"
-color="#1b7f3b"
+  label="New Morphotype"
+  color="#1b7f3b"
 ]
 
-MatchDecision -> NewMorphotype [label="NO" color="#1b7f3b"]
+MatchDecision -> NewMorphotype [
+  label="NO"
+  color="#1b7f3b"
+]
 
 
 ### CENTRAL REPERTOIRE
 
 Repertoire [
-shape=ellipse
-fillcolor="#ffd86b"
-color="#b58900"
-penwidth=3
-label="Repertoire\n(structural signal types)"
+  shape=ellipse
+  fillcolor="#ffd86b"
+  color="#b58900"
+  penwidth=3
+  label="Repertoire\n(structural signal types)"
 ]
 
-MatchDecision -> Repertoire [label="YES" color="#b58900"]
-NewMorphotype -> Repertoire [color="#1b7f3b"]
+MatchDecision -> Repertoire [
+  label="YES"
+  color="#b58900"
+]
+
+NewMorphotype -> Repertoire [
+  color="#1b7f3b"
+]
 
 
 ### UNKNOWN CONTEXT PATHWAY
 
 NoContext [
-label="Field Recording\n(context unknown)"
-color="#555555"
+  label="Field Recording\n(context unknown)"
+  color="#555555"
 ]
 
-ContextDecision -> NoContext [label="NO" color="#2b5bd7"]
+ContextDecision -> NoContext [
+  label="NO"
+  color="#2b5bd7"
+]
 
 
 ### STRUCTURAL ANALYSIS (NEP)
 
 StructuralMeasure [
-label="Structural Measurement"
-color="#1b7f3b"
+  label="Structural Measurement"
+  color="#1b7f3b"
 ]
 
 MorphotypeNEP [
-label="Structural Morphotype Classification"
-color="#1b7f3b"
+  label="Structural Morphotype Classification"
+  color="#1b7f3b"
 ]
 
-NoContext -> StructuralMeasure [color="#1b7f3b"]
-StructuralMeasure -> MorphotypeNEP [color="#1b7f3b"]
+NoContext -> StructuralMeasure [
+  color="#1b7f3b"
+]
+
+StructuralMeasure -> MorphotypeNEP [
+  color="#1b7f3b"
+]
 
 
 ### REPERTOIRE CHECK
 
 CompareRep2 [
-label="Comparison to Repertoire"
-color="#b58900"
+  label="Comparison to Repertoire"
+  color="#b58900"
 ]
 
-MorphotypeNEP -> CompareRep2 [color="#b58900"]
+MorphotypeNEP -> CompareRep2 [
+  color="#b58900"
+]
 
 
 ### SPECULATIVE SIGNAL BANK
 
 SpecBank [
-label="Speculative Signal Bank\n(structure-defined hypotheses)"
-color="#2b5bd7"
+  label="Speculative Signal Bank\n(structure-defined hypotheses)"
+  color="#2b5bd7"
 ]
 
-CompareRep2 -> SpecBank [color="#2b5bd7"]
+CompareRep2 -> SpecBank [
+  color="#2b5bd7"
+]
 
 
 ### HYPOTHESIS GENERATION
 
 PredictedContext [
-label="Predicted Behavioural Context"
-color="#2b5bd7"
+  label="Predicted Behavioural Context"
+  color="#2b5bd7"
 ]
 
-SpecBank -> PredictedContext [color="#2b5bd7"]
+SpecBank -> PredictedContext [
+  color="#2b5bd7"
+]
 
 
 ### EXPERIMENTAL VALIDATION
 
 Validation [
-shape=diamond
-label="Field Validation\n(playback experiments,\nSuzuki-style syntax tests, recreation of conditions, etc.)"
-color="#6a3dd9"
+  shape=diamond
+  label="Field Validation\n(playback experiments,\nSuzuki-style syntax tests, recreation of conditions, etc.)"
+  color="#6a3dd9"
 ]
 
-PredictedContext -> Validation [color="#6a3dd9"]
+PredictedContext -> Validation [
+  color="#6a3dd9"
+]
 
 
 ### VALIDATED KNOWLEDGE
 
 RepUpdate [
-label="Repertoire Update"
-fillcolor="#ffe8a3"
-color="#b58900"
+  label="Repertoire Update"
+  fillcolor="#ffe8a3"
+  color="#b58900"
 ]
 
-Validation -> RepUpdate [label="YES" color="#6a3dd9"]
-RepUpdate -> Repertoire [color="#b58900"]
+Validation -> RepUpdate [
+  label="YES"
+  color="#6a3dd9"
+]
 
-Validation -> SpecBank [label="NO" color="#6a3dd9"]
+RepUpdate -> Repertoire [
+  color="#b58900"
+]
+
+
+### RIGHT-SIDE NO LOOP VIA ROUTING NODE
+
+NoLoopTurn [
+  shape=point
+  width=0
+  label=""
+  color="#6a3dd9"
+]
+
+{ rank = same; SpecBank; NoLoopTurn }
+
+Validation:e -> NoLoopTurn [
+  label="NO"
+  color="#6a3dd9"
+  constraint=false
+]
+
+NoLoopTurn -> SpecBank:e [
+  color="#6a3dd9"
+  constraint=false
+]
 
 }
