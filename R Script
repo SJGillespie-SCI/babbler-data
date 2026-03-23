@@ -17,51 +17,42 @@ library(classInt)
 library(patchwork)
 
 # =========================================================
-# 1. FILE PATH
+# 1. FILE PATHS AND OUTPUT DIRECTORIES
 # =========================================================
 
 file_path <- "For Steven.xlsx"
 
-# =========================================================
-# 2. OUTPUT DIRECTORY
-# =========================================================
-
 dir.create("figures", showWarnings = FALSE)
+dir.create("outputs", showWarnings = FALSE)
 
 # =========================================================
-# 3. GLOBAL STYLE SETTINGS
+# 2. GLOBAL STYLE SETTINGS
 # =========================================================
 
 context_colours <- c(
-  short = "#2E7D32",   # deep green
-  long  = "#D84315"    # burnt orange
+  short = "#0072B2",
+  long  = "#E69F00"
 )
 
 theme_set(theme_minimal(base_size = 14))
 
 fig_single_w <- 7
 fig_single_h <- 5
+fig_panel_w  <- 10
+fig_panel_h  <- 5
 
-fig_double_w <- 10
-fig_double_h <- 5
-
-fig_grid_w <- 10
-fig_grid_h <- 8
-
-save_plot <- function(plot, filename, w = fig_single_w, h = fig_single_h){
-  
+save_plot <- function(plot, filename, w = fig_single_w, h = fig_single_h) {
   ggsave(
-    filename = paste0("figures/", filename),
+    filename = file.path("figures", filename),
     plot = plot,
     width = w,
     height = h,
     dpi = 300
   )
-  
 }
 
 # =========================================================
-# 4. LOAD DATA
+# 3. LOAD DATA
 # =========================================================
 
 short_raw <- read_excel(file_path, sheet = "short") %>%
@@ -71,7 +62,7 @@ long_raw <- read_excel(file_path, sheet = "long") %>%
   clean_names()
 
 # =========================================================
-# 5. HARMONISE DATA STRUCTURE
+# 4. HARMONISE DATA STRUCTURE
 # =========================================================
 
 short_data <- short_raw %>%
@@ -79,10 +70,9 @@ short_data <- short_raw %>%
   summarise(
     mean_duration = mean(duration, na.rm = TRUE),
     mean_f0_start = mean(f0_start, na.rm = TRUE),
-    mean_f0_end   = mean(f0_end, na.rm = TRUE),
-    mean_f0range  = mean(f0range, na.rm = TRUE),
-    mean_percent_time_max_f0 =
-      mean(percent_time_max_f0, na.rm = TRUE),
+    mean_f0_end = mean(f0_end, na.rm = TRUE),
+    mean_f0range = mean(f0range, na.rm = TRUE),
+    mean_percent_time_max_f0 = mean(percent_time_max_f0, na.rm = TRUE),
     n_calls = n(),
     .groups = "drop"
   ) %>%
@@ -100,34 +90,95 @@ long_data <- long_raw %>%
   mutate(
     mean_duration = duration,
     mean_f0_start = f0_start,
-    mean_f0_end   = f0_end,
-    mean_f0range  = f0range,
+    mean_f0_end = f0_end,
+    mean_f0range = f0range,
     mean_percent_time_max_f0 = percent_time_max_f0,
     n_calls = 1,
     emission_context = "long"
   ) %>%
   select(
-    caller_id, note_type,
-    mean_duration, mean_f0_start, mean_f0_end,
-    mean_f0range, mean_percent_time_max_f0,
-    n_calls, emission_context
+    caller_id,
+    note_type,
+    mean_duration,
+    mean_f0_start,
+    mean_f0_end,
+    mean_f0range,
+    mean_percent_time_max_f0,
+    n_calls,
+    emission_context
   )
 
 all_data <- bind_rows(short_data, long_data)
 
 # =========================================================
-# 6. DERIVED VARIABLES
+# 5. DERIVED VARIABLES
 # =========================================================
 
 all_data <- all_data %>%
   mutate(
     mean_f0_change = mean_f0_end - mean_f0_start,
-    abs_f0_change  = abs(mean_f0_change),
-    mean_f0_slope  = mean_f0_change / mean_duration
+    abs_f0_change = abs(mean_f0_change),
+    mean_f0_slope = mean_f0_change / mean_duration
   )
 
 # =========================================================
-# 7. NOTE LEVEL DURATION CLASSES
+# 6. CONTEXT-LEVEL STATISTICS
+# =========================================================
+
+run_wilcox <- function(df, var) {
+  x <- df[[var]][df$emission_context == "short"]
+  y <- df[[var]][df$emission_context == "long"]
+
+  x <- x[is.finite(x)]
+  y <- y[is.finite(y)]
+
+  if (length(x) > 0 && length(y) > 0) {
+    wt <- wilcox.test(x, y, exact = FALSE)
+
+    data.frame(
+      variable = var,
+      n_short = length(x),
+      n_long = length(y),
+      median_short = median(x, na.rm = TRUE),
+      median_long = median(y, na.rm = TRUE),
+      mean_short = mean(x, na.rm = TRUE),
+      mean_long = mean(y, na.rm = TRUE),
+      W = unname(wt$statistic),
+      p_value = wt$p.value
+    )
+  } else {
+    data.frame(
+      variable = var,
+      n_short = length(x),
+      n_long = length(y),
+      median_short = NA_real_,
+      median_long = NA_real_,
+      mean_short = NA_real_,
+      mean_long = NA_real_,
+      W = NA_real_,
+      p_value = NA_real_
+    )
+  }
+}
+
+stats_vars <- c(
+  "mean_duration",
+  "mean_f0range",
+  "abs_f0_change",
+  "mean_f0_start",
+  "mean_f0_end"
+)
+
+context_stats <- bind_rows(lapply(stats_vars, function(v) run_wilcox(all_data, v)))
+
+write.csv(
+  context_stats,
+  file = "outputs/context_stats.csv",
+  row.names = FALSE
+)
+
+# =========================================================
+# 7. NOTE-LEVEL DURATION CLASSES
 # =========================================================
 
 note_level <- all_data %>%
@@ -149,7 +200,7 @@ note_level <- note_level %>%
       note_mean_duration,
       breaks = jenks_breaks$brks,
       include.lowest = TRUE,
-      labels = c("Short","Medium","Long")
+      labels = c("Short", "Medium", "Long")
     )
   )
 
@@ -161,20 +212,24 @@ all_data <- all_data %>%
 # =========================================================
 
 morphotype_map <- tibble(
-  note_type = c("SD","U",
-                "TI",
-                "A","T","TE",
-                "B","Boo",
-                "N","W",
-                "D","I1","L",
-                "I2"),
-  morphotype = c("M1","M1",
-                 "M2",
-                 "M3","M3","M3",
-                 "M4","M4",
-                 "M5","M5",
-                 "M6","M6","M6",
-                 "M7")
+  note_type = c(
+    "SD", "U",
+    "TI",
+    "A", "T", "TE",
+    "B", "Boo",
+    "N", "W",
+    "D", "I1", "L",
+    "I2"
+  ),
+  morphotype = c(
+    "M1", "M1",
+    "M2",
+    "M3", "M3", "M3",
+    "M4", "M4",
+    "M5", "M5",
+    "M6", "M6", "M6",
+    "M7"
+  )
 )
 
 # =========================================================
@@ -184,148 +239,136 @@ morphotype_map <- tibble(
 structure_tbl <- all_data %>%
   group_by(note_type, emission_context) %>%
   summarise(
-    mean_duration = mean(mean_duration),
-    mean_f0range  = mean(mean_f0range),
-    mean_f0_change = mean(mean_f0_change),
-    abs_f0_change = mean(abs_f0_change),
-    mean_percent_time_max_f0 =
-      mean(mean_percent_time_max_f0),
-    n_calls_total = sum(n_calls),
+    mean_duration = mean(mean_duration, na.rm = TRUE),
+    mean_f0range = mean(mean_f0range, na.rm = TRUE),
+    mean_f0_change = mean(mean_f0_change, na.rm = TRUE),
+    abs_f0_change = mean(abs_f0_change, na.rm = TRUE),
+    mean_percent_time_max_f0 = mean(mean_percent_time_max_f0, na.rm = TRUE),
+    n_calls_total = sum(n_calls, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   left_join(morphotype_map, by = "note_type") %>%
   left_join(note_level, by = "note_type")
 
-# ==========================================================
-# Chestnut-crowned Babbler Dissertation
-# Visualisation Pipeline
-# Generates final thesis figures
-# ==========================================================
-
-library(ggplot2)
-library(dplyr)
-library(patchwork)
-library(ggrepel)
-
-# ==========================================================
-# Colourblind-safe palette (Okabe–Ito)
-# ==========================================================
-
-context_colours <- c(
-  short = "#0072B2",
-  long  = "#E69F00"
+write.csv(
+  structure_tbl,
+  file = "outputs/structure_table.csv",
+  row.names = FALSE
 )
 
-# ==========================================================
-# Figure export settings
-# ==========================================================
+# =========================================================
+# 10. WEIGHTED CONTEXT MEANS
+# =========================================================
 
-dir.create("figures", showWarnings = FALSE)
-
-fig_single_w <- 7
-fig_single_h <- 5
-
-fig_panel_w <- 10
-fig_panel_h <- 5
-
-save_plot <- function(plot, filename, w=7, h=5){
-  ggsave(
-    paste0("figures/", filename),
-    plot,
-    width = w,
-    height = h,
-    dpi = 300
+context_weighted <- structure_tbl %>%
+  group_by(emission_context) %>%
+  summarise(
+    weighted_mean_duration = sum(mean_duration * n_calls_total) / sum(n_calls_total),
+    weighted_mean_f0range = sum(mean_f0range * n_calls_total) / sum(n_calls_total),
+    weighted_mean_abs_change = sum(abs_f0_change * n_calls_total) / sum(n_calls_total),
+    total_notes = sum(n_calls_total),
+    .groups = "drop"
   )
-}
 
-# ==========================================================
-# Prepare variables
-# ==========================================================
+print(context_weighted)
 
-structure_tbl <- structure_tbl %>%
-  mutate(abs_f0_change = abs(mean_f0_change))
+write.csv(
+  context_weighted,
+  file = "outputs/context_weighted_means.csv",
+  row.names = FALSE
+)
 
-# ==========================================================
-# FIGURE 1
-# Acoustic morphospace (regime separation)
-# ==========================================================
+# =========================================================
+# 11. NOTE TYPE DISTRIBUTION BY CONTEXT
+# =========================================================
+
+note_type_counts <- all_data %>%
+  count(note_type, emission_context) %>%
+  pivot_wider(
+    names_from = emission_context,
+    values_from = n,
+    values_fill = 0
+  )
+
+write.csv(
+  note_type_counts,
+  file = "outputs/note_type_counts.csv",
+  row.names = FALSE
+)
+
+note_dist_table <- table(all_data$note_type, all_data$emission_context)
+note_type_chisq <- suppressWarnings(chisq.test(note_dist_table))
+
+note_type_chisq_out <- data.frame(
+  statistic = unname(note_type_chisq$statistic),
+  df = unname(note_type_chisq$parameter),
+  p_value = note_type_chisq$p.value
+)
+
+write.csv(
+  note_type_chisq_out,
+  file = "outputs/note_type_chisq.csv",
+  row.names = FALSE
+)
+
+# =========================================================
+# 12. FIGURE 1
+# Acoustic morphospace
+# =========================================================
 
 fig_morphospace <- ggplot(
   structure_tbl,
-  aes(mean_f0range, abs_f0_change, colour = emission_context)
+  aes(x = mean_f0range, y = abs_f0_change, colour = emission_context)
 ) +
-  
   geom_point(size = 4, alpha = 0.9) +
-  
   geom_text_repel(
     aes(label = note_type),
     size = 3,
     max.overlaps = Inf
   ) +
-  
   scale_colour_manual(values = context_colours) +
-  
   labs(
     title = "Acoustic Morphospace of Babbler Notes",
     x = "Fundamental Frequency Range (Hz)",
     y = "Absolute Frequency Change (Hz)",
     colour = "Emission Context"
-  ) +
-  
-  theme_minimal(base_size = 12)
+  )
 
 save_plot(
   fig_morphospace,
   "Figure1_acoustic_morphospace.png"
 )
 
-# ==========================================================
-# FIGURE 2
-# Spectral bandwidth comparison
-# ==========================================================
+# =========================================================
+# 13. FIGURE 2
+# Spectral structure panel
+# =========================================================
 
 fig_bandwidth <- ggplot(
   structure_tbl,
-  aes(emission_context, mean_f0range, fill = emission_context)
+  aes(x = emission_context, y = mean_f0range, fill = emission_context)
 ) +
-  
   geom_violin(alpha = 0.6) +
   geom_boxplot(width = 0.25) +
-  
   scale_fill_manual(values = context_colours) +
-  
   labs(
     title = "Spectral Bandwidth by Emission Context",
     x = "Emission Context",
     y = "Mean F0 Range (Hz)"
-  ) +
-  
-  theme_minimal(base_size = 12)
-
-# ==========================================================
-# FIGURE 3
-# Contour magnitude comparison
-# ==========================================================
+  )
 
 fig_contour <- ggplot(
   structure_tbl,
-  aes(emission_context, abs_f0_change, fill = emission_context)
+  aes(x = emission_context, y = abs_f0_change, fill = emission_context)
 ) +
-  
   geom_violin(alpha = 0.6) +
   geom_boxplot(width = 0.25) +
-  
   scale_fill_manual(values = context_colours) +
-  
   labs(
     title = "Frequency Contour Magnitude by Context",
     x = "Emission Context",
     y = "Absolute F0 Change (Hz)"
-  ) +
-  
-  theme_minimal(base_size = 12)
-
-# Combine spectral plots (1×2 panel)
+  )
 
 fig_spectral_panel <- fig_bandwidth + fig_contour
 
@@ -336,40 +379,41 @@ save_plot(
   h = fig_panel_h
 )
 
-# ==========================================================
-# FIGURE 4
+# =========================================================
+# 14. FIGURE 3
 # Duration by context
-# ==========================================================
+# =========================================================
 
 fig_duration <- ggplot(
   structure_tbl,
-  aes(emission_context, mean_duration, fill = emission_context)
+  aes(x = emission_context, y = mean_duration, fill = emission_context)
 ) +
-  
   geom_violin(alpha = 0.6) +
   geom_boxplot(width = 0.25) +
-  
   scale_fill_manual(values = context_colours) +
-  
   labs(
     title = "Note Duration by Emission Context",
     x = "Emission Context",
     y = "Mean Duration (seconds)"
-  ) +
-  
-  theme_minimal(base_size = 12)
+  )
 
 save_plot(
   fig_duration,
   "Figure3_duration_by_context.png"
 )
 
-# ==========================================================
-# Summary message
-# ==========================================================
+# =========================================================
+# 15. SUMMARY MESSAGE
+# =========================================================
 
 cat("\nFigures exported to /figures folder:\n")
-cat("1. Acoustic morphospace\n")
-cat("2. Spectral structure panel\n")
-cat("3. Duration comparison\n")
-# =========================================================
+cat("1. Figure1_acoustic_morphospace.png\n")
+cat("2. Figure2_spectral_structure.png\n")
+cat("3. Figure3_duration_by_context.png\n")
+
+cat("\nTables exported to /outputs folder:\n")
+cat("1. context_stats.csv\n")
+cat("2. context_weighted_means.csv\n")
+cat("3. note_type_counts.csv\n")
+cat("4. note_type_chisq.csv\n")
+cat("5. structure_table.csv\n")
